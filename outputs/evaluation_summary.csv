@@ -1,0 +1,26 @@
+Metric,Value
+Dataset,Real ED arrivals (2014–2017)
+Model,LightGBM – Poisson objective
+Best learning_rate,0.1
+Best num_leaves,31
+Best min_child_samples,50
+Number of trees,65
+--- SPLIT METRICS ---,
+Train MAE,1.4926
+Validation MAE,1.5866
+Test MAE,1.7433
+Test RMSE,2.3216
+--- PEAK HOURS ---,
+Peak-hour MAE (10:00-19:00),2.1398
+Off-peak MAE,1.4601
+--- SKILL SCORE ---,
+Seasonal-naïve baseline MAE,2.3494
+Skill score vs naïve baseline,0.258
+--- HIGH-LOAD DETECTION ---,
+Actual high-load threshold (75th pct of training),5.0
+Predicted high-load threshold (75th pct of preds),5.42
+Actual high-load hours,4389
+Predicted high-load hours,2185
+High-load Precision,0.7831
+High-load Recall,0.3898
+High-load F1,0.5205
