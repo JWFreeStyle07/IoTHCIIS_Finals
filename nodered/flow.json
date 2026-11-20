@@ -1,170 +1,277 @@
 [
   {
-    "id": "tab_balikbisita",
+    "id": "tab_bb",
     "type": "tab",
-    "label": "BalikBisita – ML Forecast Simulation",
+    "label": "BalikBisita Dashboard",
     "disabled": false,
-    "info": "Simulates live kiosk check-ins and fetches 24-hour forecasts from the Flask prediction service."
+    "info": ""
   },
-
   {
-    "id": "inject_simulate",
+    "id": "inj_tick",
     "type": "inject",
-    "z": "tab_balikbisita",
-    "name": "Simulate check-in (every 10s)",
-    "props": [{ "p": "payload" }],
+    "z": "tab_bb",
+    "name": "Tick every 10s",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
     "repeat": "10",
-    "crontab": "",
     "once": true,
     "onceDelay": 1,
-    "topic": "",
     "payload": "",
     "payloadType": "date",
-    "x": 160,
-    "y": 100,
-    "wires": [["fn_build_checkin"]]
-  },
-
-  {
-    "id": "inject_manual",
-    "type": "inject",
-    "z": "tab_balikbisita",
-    "name": "Manual forecast trigger",
-    "props": [{ "p": "payload" }],
-    "repeat": "",
-    "crontab": "",
-    "once": false,
-    "onceDelay": 0,
-    "topic": "",
-    "payload": "",
-    "payloadType": "date",
-    "x": 160,
-    "y": 260,
-    "wires": [["fn_prepare_forecast_request"]]
-  },
-
-  {
-    "id": "fn_build_checkin",
-    "type": "function",
-    "z": "tab_balikbisita",
-    "name": "Build simulated check-in",
-    "func": "var now = new Date();\nvar history = flow.get('history') || [];\n\n// Simulate a realistic count based on hour of day\nvar hour = now.getHours();\nvar base = (hour >= 8 && hour <= 17) ? 8 : 2;\nvar simCount = Math.floor(Math.random() * base) + 1;\n\nvar entry = {\n    timestamp: new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, 0, 0)\n                  .toISOString().slice(0,19),\n    count: simCount\n};\nhistory.push(entry);\nif (history.length > 336) history = history.slice(history.length - 336);\nflow.set('history', history);\n\n// Output 1: for display nodes\nvar displayMsg = {\n    payload: {\n        timestamp: entry.timestamp,\n        count: simCount\n    },\n    topic: 'check_in'\n};\n\n// Output 2: for text widget\nvar textMsg = {\n    payload: entry.timestamp + '   count: ' + simCount\n};\n\nreturn [displayMsg, textMsg];",
-    "outputs": 2,
-    "x": 420,
-    "y": 100,
+    "x": 130,
+    "y": 80,
     "wires": [
-      ["debug_checkin", "fn_prepare_forecast_request"],
-      ["ui_text_last_checkin"]
+      [
+        "fn_checkin"
+      ]
     ]
   },
-
   {
-    "id": "debug_checkin",
-    "type": "debug",
-    "z": "tab_balikbisita",
-    "name": "Check-in event",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusType": "auto",
-    "x": 680,
-    "y": 60,
-    "wires": []
+    "id": "inj_manual",
+    "type": "inject",
+    "z": "tab_bb",
+    "name": "Manual trigger",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "once": false,
+    "payload": "",
+    "payloadType": "date",
+    "x": 130,
+    "y": 140,
+    "wires": [
+      [
+        "fn_build_req"
+      ]
+    ]
   },
-
   {
-    "id": "ui_text_last_checkin",
-    "type": "ui_text",
-    "z": "tab_balikbisita",
-    "group": "group_live",
+    "id": "inj_patients",
+    "type": "inject",
+    "z": "tab_bb",
+    "name": "Load patients once",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "payload": "{}",
+    "payloadType": "json",
+    "x": 130,
+    "y": 200,
+    "wires": [
+      [
+        "tpl_patients"
+      ]
+    ]
+  },
+  {
+    "id": "inj_footer",
+    "type": "inject",
+    "z": "tab_bb",
+    "name": "Load footer once",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "once": true,
+    "onceDelay": 0.5,
+    "payload": "{}",
+    "payloadType": "json",
+    "x": 130,
+    "y": 260,
+    "wires": [
+      [
+        "tpl_footer"
+      ]
+    ]
+  },
+  {
+    "id": "fn_checkin",
+    "type": "function",
+    "z": "tab_bb",
+    "name": "Simulate check-in",
+    "func": "var now  = new Date();\nvar hour = now.getHours();\nvar base = (hour >= 8 && hour <= 17) ? 9 : 2;\nvar cnt  = Math.floor(Math.random() * base) + 1;\n\nvar history = flow.get('history') || [];\nvar entry   = {\n    timestamp: new Date(now.getFullYear(), now.getMonth(),\n                        now.getDate(), hour, 0, 0).toISOString().slice(0,19),\n    count: cnt\n};\nhistory.push(entry);\nif (history.length > 336) history = history.slice(history.length - 336);\nflow.set('history', history);\n\nvar dayTotal = flow.get('dayTotal') || 0;\nvar lastHour = flow.get('lastHour');\nif (lastHour !== hour) {\n    if (hour === 0) { flow.set('dayTotal', 0); dayTotal = 0; }\n    flow.set('lastHour', hour);\n}\ndayTotal += cnt;\nflow.set('dayTotal', dayTotal);\n\nvar stats = { checkins: dayTotal, upcoming: 18, due: 7, overdue: 5, visited: 12 };\nflow.set('stats', stats);\n\nvar days   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];\nvar months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];\nvar dateStr = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' +\n              now.getDate() + ', ' + now.getFullYear();\n\nvar statsMsg = { payload: {\n    date: dateStr, checkins: stats.checkins,\n    upcoming: stats.upcoming, due: stats.due,\n    overdue: stats.overdue, visited: stats.visited\n}};\n\nvar textMsg = { payload: entry.timestamp + '  count: ' + cnt };\n\nreturn [statsMsg, textMsg];",
+    "outputs": 2,
+    "x": 360,
+    "y": 80,
+    "wires": [
+      [
+        "tpl_stats",
+        "fn_build_req"
+      ],
+      [
+        "txt_checkin"
+      ]
+    ]
+  },
+  {
+    "id": "fn_build_req",
+    "type": "function",
+    "z": "tab_bb",
+    "name": "Build forecast request",
+    "func": "var history = flow.get('history') || [];\nif (history.length < 24) {\n    node.status({fill:'yellow',shape:'ring',text:'need '+history.length+'/24'});\n    return null;\n}\nvar now = new Date();\nvar tom = new Date(now); tom.setDate(tom.getDate()+1);\nvar yyyy = tom.getFullYear();\nvar mm   = String(tom.getMonth()+1).padStart(2,'0');\nvar dd   = String(tom.getDate()).padStart(2,'0');\nnode.status({fill:'blue',shape:'dot',text:'fetching '+yyyy+'-'+mm+'-'+dd});\nmsg.payload = { date: yyyy+'-'+mm+'-'+dd, history: history };\nmsg.headers = {'Content-Type':'application/json'};\nreturn msg;",
+    "outputs": 1,
+    "x": 590,
+    "y": 140,
+    "wires": [
+      [
+        "http_predict"
+      ]
+    ]
+  },
+  {
+    "id": "fn_check_resp",
+    "type": "function",
+    "z": "tab_bb",
+    "name": "Check response",
+    "func": "if (msg.statusCode !== 200 || !msg.payload || !msg.payload.forecasts) {\n    node.status({fill:'red',shape:'dot',text:'unreachable'});\n    return [null, {payload: '⚠ Flask offline. Run: python src\\\\predict_service.py'}];\n}\nnode.status({fill:'green',shape:'dot',text:'OK '+new Date().toLocaleTimeString()});\nreturn [msg, null];",
+    "outputs": 2,
+    "x": 850,
+    "y": 140,
+    "wires": [
+      [
+        "fn_format"
+      ],
+      [
+        "txt_status"
+      ]
+    ]
+  },
+  {
+    "id": "fn_format",
+    "type": "function",
+    "z": "tab_bb",
+    "name": "Format for dashboard",
+    "func": "var fc   = msg.payload.forecasts;\nvar date = msg.payload.date;\nvar HIGH = 5.0;\n\nvar labels = fc.map(function(f){ return f.hour+':00'; });\nvar values = fc.map(function(f){ return f.predicted_count; });\n\nvar highWindows = [];\nvar inW = false; var wS = null;\nfc.forEach(function(f){\n    if (f.predicted_count >= HIGH && !inW) { inW=true; wS=f.hour; }\n    if (f.predicted_count <  HIGH &&  inW) { inW=false; highWindows.push(wS+':00–'+f.hour+':00'); }\n});\nif (inW) highWindows.push(wS+':00–23:00');\n\nvar peak = fc.reduce(function(a,b){ return a.predicted_count>b.predicted_count?a:b; });\n\nvar chartMsg = {\n    payload: [{ label: date, data: values }],\n    labels : labels,\n    topic  : date\n};\nvar infoMsg = {\n    payload: { date: date, peakHour: peak, peakCount: peak.predicted_count,\n               highWindows: highWindows, forecasts: fc }\n};\nreturn [chartMsg, infoMsg];",
+    "outputs": 2,
+    "x": 1060,
+    "y": 140,
+    "wires": [
+      [
+        "ui_chart"
+      ],
+      [
+        "tpl_forecast_info"
+      ]
+    ]
+  },
+  {
+    "id": "http_predict",
+    "type": "http request",
+    "z": "tab_bb",
+    "name": "POST /predict",
+    "method": "POST",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://127.0.0.1:5000/predict",
+    "x": 720,
+    "y": 140,
+    "wires": [
+      [
+        "fn_check_resp"
+      ]
+    ]
+  },
+  {
+    "id": "tpl_stats",
+    "type": "ui_template",
+    "z": "tab_bb",
+    "name": "Stats Cards",
+    "group": "grp_stats",
     "order": 1,
+    "width": 0,
+    "height": 0,
+    "format": "<div style='font-family:Inter,Arial,sans-serif;padding:6px 2px;'>\n  <div style='margin-bottom:14px;'>\n    <div style='font-size:22px;font-weight:700;color:#1A237E;'>Good Morning!</div>\n    <div style='font-size:13px;color:#555;'>Here&rsquo;s today&rsquo;s patient follow-up overview &mdash; {{msg.payload.date}}</div>\n  </div>\n  <div style='display:flex;gap:10px;flex-wrap:wrap;'>\n    <div style='flex:1;min-width:130px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 14px;'>\n      <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>\n        <div style='width:32px;height:32px;border-radius:8px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;font-size:17px;'>&#128197;</div>\n        <div style='font-size:10px;color:#1D4ED8;font-weight:700;letter-spacing:.5px;'>CHECK-INS TODAY</div>\n      </div>\n      <div style='font-size:30px;font-weight:700;color:#1E3A8A;line-height:1.1;'>{{msg.payload.checkins}}</div>\n      <div style='font-size:11px;color:#059669;margin-top:2px;'>&#8679; 12% vs. yesterday</div>\n    </div>\n    <div style='flex:1;min-width:130px;background:#F5F3FF;border:1px solid #DDD6FE;border-radius:10px;padding:12px 14px;'>\n      <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>\n        <div style='width:32px;height:32px;border-radius:8px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;font-size:17px;'>&#128336;</div>\n        <div style='font-size:10px;color:#7C3AED;font-weight:700;letter-spacing:.5px;'>UPCOMING</div>\n      </div>\n      <div style='font-size:30px;font-weight:700;color:#4C1D95;line-height:1.1;'>{{msg.payload.upcoming}}</div>\n      <div style='font-size:11px;color:#059669;margin-top:2px;'>&#8679; 8% vs. yesterday</div>\n    </div>\n    <div style='flex:1;min-width:130px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:10px;padding:12px 14px;'>\n      <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>\n        <div style='width:32px;height:32px;border-radius:8px;background:#FEF3C7;display:flex;align-items:center;justify-content:center;font-size:17px;'>&#9888;</div>\n        <div style='font-size:10px;color:#D97706;font-weight:700;letter-spacing:.5px;'>DUE</div>\n      </div>\n      <div style='font-size:30px;font-weight:700;color:#92400E;line-height:1.1;'>{{msg.payload.due}}</div>\n      <div style='font-size:11px;color:#D97706;margin-top:2px;'>&#8679; 3% vs. yesterday</div>\n    </div>\n    <div style='flex:1;min-width:130px;background:#FEF2F2;border:1px solid #FECACA;border-radius:10px;padding:12px 14px;'>\n      <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>\n        <div style='width:32px;height:32px;border-radius:8px;background:#FEE2E2;display:flex;align-items:center;justify-content:center;font-size:17px;'>&#128683;</div>\n        <div style='font-size:10px;color:#DC2626;font-weight:700;letter-spacing:.5px;'>OVERDUE</div>\n      </div>\n      <div style='font-size:30px;font-weight:700;color:#7F1D1D;line-height:1.1;'>{{msg.payload.overdue}}</div>\n      <div style='font-size:11px;color:#DC2626;margin-top:2px;'>&#8679; 8% vs. yesterday</div>\n    </div>\n    <div style='flex:1;min-width:130px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:10px;padding:12px 14px;'>\n      <div style='display:flex;align-items:center;gap:8px;margin-bottom:4px;'>\n        <div style='width:32px;height:32px;border-radius:8px;background:#DCFCE7;display:flex;align-items:center;justify-content:center;font-size:17px;'>&#10003;</div>\n        <div style='font-size:10px;color:#16A34A;font-weight:700;letter-spacing:.5px;'>VISITED</div>\n      </div>\n      <div style='font-size:30px;font-weight:700;color:#14532D;line-height:1.1;'>{{msg.payload.visited}}</div>\n      <div style='font-size:11px;color:#059669;margin-top:2px;'>&#8679; 2% vs. yesterday</div>\n    </div>\n  </div>\n</div>",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "x": 580,
+    "y": 80,
+    "wires": [
+      []
+    ]
+  },
+  {
+    "id": "txt_checkin",
+    "type": "ui_text",
+    "z": "tab_bb",
+    "group": "grp_stats",
+    "order": 2,
     "width": 6,
     "height": 1,
     "name": "Last check-in",
     "label": "Last simulated check-in",
     "format": "{{msg.payload}}",
     "layout": "row-spread",
-    "x": 680,
-    "y": 120,
+    "x": 580,
+    "y": 40,
     "wires": []
   },
-
   {
-    "id": "fn_prepare_forecast_request",
-    "type": "function",
-    "z": "tab_balikbisita",
-    "name": "Build forecast request",
-    "func": "var history = flow.get('history') || [];\nif (history.length < 24) {\n    node.status({fill:'yellow', shape:'ring', text:'waiting for history (' + history.length + '/24)'});\n    return null;\n}\n\nvar now = new Date();\nvar tomorrow = new Date(now);\ntomorrow.setDate(tomorrow.getDate() + 1);\nvar yyyy = tomorrow.getFullYear();\nvar mm   = String(tomorrow.getMonth() + 1).padStart(2,'0');\nvar dd   = String(tomorrow.getDate()).padStart(2,'0');\n\nnode.status({fill:'blue', shape:'dot', text:'requesting forecast for ' + yyyy+'-'+mm+'-'+dd});\n\nmsg.payload = {\n    date   : yyyy + '-' + mm + '-' + dd,\n    history: history\n};\nmsg.headers = { 'Content-Type': 'application/json' };\nreturn msg;",
-    "outputs": 1,
-    "x": 430,
-    "y": 180,
-    "wires": [["http_forecast"]]
+    "id": "txt_status",
+    "type": "ui_text",
+    "z": "tab_bb",
+    "group": "grp_stats",
+    "order": 3,
+    "width": 6,
+    "height": 1,
+    "name": "Service status",
+    "label": "Forecast service",
+    "format": "{{msg.payload}}",
+    "layout": "row-spread",
+    "x": 1060,
+    "y": 220,
+    "wires": []
   },
-
   {
-    "id": "http_forecast",
-    "type": "http request",
-    "z": "tab_balikbisita",
-    "name": "POST /predict",
-    "method": "POST",
-    "ret": "obj",
-    "paytoqs": "ignore",
-    "url": "http://127.0.0.1:5000/predict",
-    "tls": "",
-    "persist": false,
-    "proxy": "",
-    "authType": "",
-    "x": 650,
-    "y": 180,
-    "wires": [["fn_check_error"]]
-  },
-
-  {
-    "id": "fn_check_error",
-    "type": "function",
-    "z": "tab_balikbisita",
-    "name": "Check Flask response",
-    "func": "// If Flask is not running, statusCode will be undefined or an error object\nif (msg.statusCode !== 200 || !msg.payload || !msg.payload.forecasts) {\n    var errText = (msg.payload && msg.payload.error)\n        ? msg.payload.error\n        : 'Flask service not reachable. Start it with: .\\\\venv\\\\Scripts\\\\python src\\\\predict_service.py';\n    node.error(errText, msg);\n    node.status({fill:'red', shape:'dot', text:'Flask unreachable'});\n\n    // Send error text to dashboard status widget\n    var errMsg = { payload: '⚠ ' + errText };\n    return [null, errMsg];\n}\n\nnode.status({fill:'green', shape:'dot', text:'OK ' + new Date().toLocaleTimeString()});\nreturn [msg, null];",
-    "outputs": 2,
-    "x": 840,
-    "y": 180,
+    "id": "tpl_patients",
+    "type": "ui_template",
+    "z": "tab_bb",
+    "name": "Patient Table",
+    "group": "grp_patients",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "format": "<style>\n.bbt{width:100%;border-collapse:collapse;font-family:Inter,Arial,sans-serif;font-size:12px;}\n.bbt th{background:#F1F5F9;color:#475569;font-weight:600;padding:6px 8px;text-align:left;border-bottom:2px solid #E2E8F0;white-space:nowrap;}\n.bbt td{padding:6px 8px;border-bottom:1px solid #F1F5F9;vertical-align:middle;white-space:nowrap;}\n.bbt tr:hover td{background:#F8FAFC;}\n.bdg{display:inline-block;padding:1px 9px;border-radius:20px;font-size:10.5px;font-weight:600;}\n.up{background:#EEF2FF;color:#4F46E5;}\n.du{background:#FFFBEB;color:#D97706;}\n.ov{background:#FEF2F2;color:#DC2626;}\n.vi{background:#F0FDF4;color:#16A34A;}\n.av{width:26px;height:26px;border-radius:50%;background:#DBEAFE;display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:5px;vertical-align:middle;}\n.ba{border:1px solid #CBD5E1;background:#fff;border-radius:5px;padding:2px 8px;font-size:10.5px;cursor:pointer;color:#1D4ED8;}\n.sb{width:100%;padding:5px 10px;border:1px solid #E2E8F0;border-radius:7px;font-size:12px;margin-bottom:7px;box-sizing:border-box;}\n.fb{padding:3px 10px;border-radius:20px;border:1px solid #CBD5E1;background:#fff;font-size:11px;cursor:pointer;margin-right:3px;margin-bottom:4px;}\n.fb.ac{background:#1E3A8A;color:#fff;border-color:#1E3A8A;}\n</style>\n<div style='font-family:Inter,Arial,sans-serif;padding:2px;'>\n  <div style='display:flex;align-items:center;gap:8px;margin-bottom:7px;flex-wrap:wrap;'>\n    <input class='sb' type='text' placeholder='&#128269; Search patient name or ID&hellip;' style='flex:1;min-width:200px;margin-bottom:0;'/>\n    <div>\n      <button class='fb ac'>All</button>\n      <button class='fb'>Upcoming</button>\n      <button class='fb'>Due</button>\n      <button class='fb'>Overdue</button>\n      <button class='fb'>Reminder Sent</button>\n      <button class='fb'>Visited</button>\n    </div>\n  </div>\n  <table class='bbt'>\n    <thead><tr>\n      <th>Patient</th><th>Patient ID</th><th>Condition</th>\n      <th>Last Visit</th><th>Next Follow-up</th><th>Status</th><th>Action</th>\n    </tr></thead>\n    <tbody>\n      <tr><td><span class='av'>&#128100;</span>Juan Dela Cruz</td><td style='color:#94A3B8;'>P-0016</td><td>Hypertension</td><td>Oct 15, 2025</td><td>Nov 20, 2026</td><td><span class='bdg up'>Upcoming</span></td><td><button class='ba'>&#128222; Contact</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Maria Santos</td><td style='color:#94A3B8;'>P-0034</td><td>Diabetes</td><td>Oct 10, 2025</td><td>Nov 18, 2025</td><td><span class='bdg du'>Due</span></td><td><button class='ba'>&#128222; Contact</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Pedro Reyes</td><td style='color:#94A3B8;'>P-0021</td><td>Tuberculosis</td><td>Oct 17, 2025</td><td>Nov 17, 2025</td><td><span class='bdg ov'>Overdue</span></td><td><button class='ba'>&#9993; Reminder</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Ana Garcia</td><td style='color:#94A3B8;'>P-0040</td><td>Hypertension</td><td>Oct 12, 2025</td><td>Oct 22, 2025</td><td><span class='bdg du'>Due</span></td><td><button class='ba'>&#128222; Contact</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Luis Navarro</td><td style='color:#94A3B8;'>P-0071</td><td>Diabetes</td><td>Oct 17, 2024</td><td>Nov 14, 2025</td><td><span class='bdg up'>Upcoming</span></td><td><button class='ba'>&#128065; View</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Carla Santos</td><td style='color:#94A3B8;'>P-0105</td><td>Hypertension</td><td>Nov 12, 2025</td><td>Dec 1, 2025</td><td><span class='bdg up'>Upcoming</span></td><td><button class='ba'>&#128065; View</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Ramon Cruz</td><td style='color:#94A3B8;'>P-0110</td><td>Tuberculosis</td><td>Nov 8, 2025</td><td>Nov 6, 2025</td><td><span class='bdg vi'>Visited</span></td><td><button class='ba'>&#128065; View</button></td></tr>\n      <tr><td><span class='av'>&#128100;</span>Bea Lopez</td><td style='color:#94A3B8;'>P-0124</td><td>Diabetes</td><td>Nov 12, 2024</td><td>Nov 10, 2025</td><td><span class='bdg vi'>Visited</span></td><td><button class='ba'>&#128065; View</button></td></tr>\n    </tbody>\n  </table>\n</div>",
+    "storeOutMessages": false,
+    "fwdInMessages": false,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "x": 360,
+    "y": 200,
     "wires": [
-      ["fn_format_forecast"],
-      ["ui_text_status"]
+      []
     ]
   },
-
   {
-    "id": "fn_format_forecast",
-    "type": "function",
-    "z": "tab_balikbisita",
-    "name": "Format forecast for dashboard",
-    "func": "var forecasts = msg.payload.forecasts;\nvar date      = msg.payload.date;\n\n// node-red-dashboard ui_chart expects:\n//   msg.payload = [ { series:[label], data:[{x,y},...] } ]\n// OR the simpler array-of-values form when labels are set via msg.labels\n\nvar labels = forecasts.map(function(f){ return f.hour + ':00'; });\nvar values = forecasts.map(function(f){ return f.predicted_count; });\n\n// Format for ui_chart bar chart\nmsg.payload = [{ label: date, data: values }];\nmsg.labels  = labels;\nmsg.topic   = date;\n\n// Also update status text\nvar statusMsg = { payload: 'Forecast for ' + date + ' loaded (' + values.length + ' hours)' };\n\nreturn msg;",
-    "outputs": 1,
-    "x": 1060,
-    "y": 160,
-    "wires": [["chart_forecast", "debug_forecast"]]
-  },
-
-  {
-    "id": "chart_forecast",
+    "id": "ui_chart",
     "type": "ui_chart",
-    "z": "tab_balikbisita",
-    "name": "24-Hour Forecast",
-    "group": "group_forecast",
+    "z": "tab_bb",
+    "name": "Forecast Chart",
+    "group": "grp_chart",
     "order": 1,
-    "width": 12,
-    "height": 8,
-    "label": "Predicted check-ins – next 24 hours",
-    "chartType": "bar",
+    "width": 0,
+    "height": 7,
+    "label": "",
+    "chartType": "line",
     "legend": "false",
     "xformat": "auto",
-    "interpolate": "linear",
+    "interpolate": "monotone",
     "nodata": "Waiting for forecast data…",
-    "dot": false,
+    "dot": true,
     "ymin": "0",
     "ymax": "",
     "removeOlder": 1,
@@ -172,70 +279,106 @@
     "removeOlderUnit": "604800",
     "cutout": 0,
     "useOneColor": true,
-    "useUTC": false,
-    "colors": ["#1565C0"],
-    "outputs": 1,
-    "x": 1290,
-    "y": 140,
-    "wires": [[]]
-  },
-
-  {
-    "id": "debug_forecast",
-    "type": "debug",
-    "z": "tab_balikbisita",
-    "name": "Forecast output",
-    "active": true,
-    "tosidebar": true,
-    "console": false,
-    "tostatus": true,
-    "complete": "payload",
-    "targetType": "msg",
-    "statusType": "auto",
-    "x": 1290,
-    "y": 200,
+    "colors": [
+      "#1565C0",
+      "#E3F2FD",
+      "#90CAF9"
+    ],
+    "outputs": 0,
+    "x": 1280,
+    "y": 100,
     "wires": []
   },
-
   {
-    "id": "ui_text_status",
-    "type": "ui_text",
-    "z": "tab_balikbisita",
-    "group": "group_live",
-    "order": 2,
-    "width": 6,
-    "height": 1,
-    "name": "Flask status",
-    "label": "Forecast service",
-    "format": "{{msg.payload}}",
-    "layout": "row-spread",
-    "x": 1070,
-    "y": 220,
-    "wires": []
+    "id": "tpl_forecast_info",
+    "type": "ui_template",
+    "z": "tab_bb",
+    "name": "Forecast Info",
+    "group": "grp_forecast",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "format": "<div style='font-family:Inter,Arial,sans-serif;padding:4px 6px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;'>\n  <!-- Peak hour -->\n  <div style='flex:1;min-width:140px;background:#FFF3E0;border:1px solid #FFB300;border-radius:8px;padding:10px 12px;'>\n    <div style='font-size:10px;color:#E65100;font-weight:700;letter-spacing:.5px;'>&#9650; PEAK HOUR</div>\n    <div style='font-size:22px;font-weight:700;color:#BF360C;line-height:1.2;'>{{msg.payload.peakHour ? msg.payload.peakHour.hour : \"--\"}}:00</div>\n    <div style='font-size:11px;color:#555;'>{{msg.payload.peakCount | number:1}} arrivals expected</div>\n  </div>\n  <!-- High-load alert -->\n  <div ng-if='msg.payload.highWindows && msg.payload.highWindows.length > 0'\n       style='flex:1;min-width:180px;background:#FFEBEE;border:1px solid #E53935;border-radius:8px;padding:10px 12px;'>\n    <div style='font-size:10px;color:#B71C1C;font-weight:700;letter-spacing:.5px;'>&#9888; HIGH LOAD PREDICTED</div>\n    <div style='font-size:12px;font-weight:600;color:#C62828;' ng-repeat='w in msg.payload.highWindows'>{{w}}</div>\n  </div>\n  <div ng-if='!msg.payload.highWindows || msg.payload.highWindows.length === 0'\n       style='flex:1;min-width:180px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px 12px;'>\n    <div style='font-size:10px;color:#1B5E20;font-weight:700;'>&#10003; ALL HOURS NORMAL</div>\n    <div style='font-size:12px;color:#2E7D32;'>No high-load windows detected</div>\n  </div>\n  <!-- Forecast date -->\n  <div style='flex:1;min-width:140px;background:#E3F2FD;border:1px solid #90CAF9;border-radius:8px;padding:10px 12px;'>\n    <div style='font-size:10px;color:#0D47A1;font-weight:700;letter-spacing:.5px;'>&#128197; FORECAST DATE</div>\n    <div style='font-size:14px;font-weight:700;color:#1565C0;'>{{msg.payload.date || \"Waiting...\"}}</div>\n  </div>\n  <!-- Quick actions -->\n  <div style='flex:2;min-width:280px;'>\n    <div style='font-size:11px;font-weight:700;color:#1A237E;margin-bottom:6px;'>Quick Actions</div>\n    <div style='display:flex;gap:7px;flex-wrap:wrap;'>\n      <div style='flex:1;min-width:120px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;cursor:pointer;'>\n        <div style='display:flex;align-items:center;gap:7px;'>\n          <div style='width:26px;height:26px;border-radius:6px;background:#DBEAFE;display:flex;align-items:center;justify-content:center;font-size:13px;'>&#128202;</div>\n          <div><div style='font-size:11.5px;font-weight:600;color:#1E3A8A;'>Generate Forecast</div><div style='font-size:10px;color:#64748B;'>Update 24-hr prediction</div></div>\n        </div><div style='color:#94A3B8;font-size:14px;'>&#8250;</div>\n      </div>\n      <div style='flex:1;min-width:120px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;cursor:pointer;'>\n        <div style='display:flex;align-items:center;gap:7px;'>\n          <div style='width:26px;height:26px;border-radius:6px;background:#EDE9FE;display:flex;align-items:center;justify-content:center;font-size:13px;'>&#128196;</div>\n          <div><div style='font-size:11.5px;font-weight:600;color:#4C1D95;'>View Reports</div><div style='font-size:10px;color:#64748B;'>Access detailed reports</div></div>\n        </div><div style='color:#94A3B8;font-size:14px;'>&#8250;</div>\n      </div>\n      <div style='flex:1;min-width:120px;display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:7px;cursor:pointer;'>\n        <div style='display:flex;align-items:center;gap:7px;'>\n          <div style='width:26px;height:26px;border-radius:6px;background:#DCFCE7;display:flex;align-items:center;justify-content:center;font-size:13px;'>&#128101;</div>\n          <div><div style='font-size:11.5px;font-weight:600;color:#14532D;'>Manage Patients</div><div style='font-size:10px;color:#64748B;'>Add or edit patients</div></div>\n        </div><div style='color:#94A3B8;font-size:14px;'>&#8250;</div>\n      </div>\n    </div>\n  </div>\n</div>",
+    "storeOutMessages": true,
+    "fwdInMessages": true,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "x": 1280,
+    "y": 160,
+    "wires": [
+      []
+    ]
   },
-
   {
-    "id": "group_forecast",
-    "type": "ui_group",
-    "name": "24-Hour Forecast",
-    "tab": "ui_tab_main",
-    "order": 2,
-    "disp": true,
-    "width": 12,
-    "collapse": false
+    "id": "tpl_footer",
+    "type": "ui_template",
+    "z": "tab_bb",
+    "name": "Footer",
+    "group": "grp_footer",
+    "order": 1,
+    "width": 0,
+    "height": 0,
+    "format": "<div style='font-family:Inter,Arial,sans-serif;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:12px;'>\n  <div style='font-size:20px;'>&#8505;</div>\n  <div style='font-size:13px;color:#1E3A8A;'><b>BalikBisita</b> helps you stay on track with patient follow-ups and predicts patient volume for better preparation.</div>\n</div>",
+    "storeOutMessages": false,
+    "fwdInMessages": false,
+    "resendOnRefresh": true,
+    "templateScope": "local",
+    "x": 360,
+    "y": 260,
+    "wires": [
+      []
+    ]
   },
-
   {
-    "id": "group_live",
+    "id": "grp_stats",
     "type": "ui_group",
-    "name": "Live Check-ins",
+    "name": "Overview",
     "tab": "ui_tab_main",
     "order": 1,
-    "disp": true,
-    "width": 12,
+    "disp": false,
+    "width": "12",
     "collapse": false
   },
-
+  {
+    "id": "grp_patients",
+    "type": "ui_group",
+    "name": "Patient Follow-up List",
+    "tab": "ui_tab_main",
+    "order": 2,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "grp_footer",
+    "type": "ui_group",
+    "name": "",
+    "tab": "ui_tab_main",
+    "order": 3,
+    "disp": false,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "grp_chart",
+    "type": "ui_group",
+    "name": "24-Hour Patient Forecast",
+    "tab": "ui_tab_main",
+    "order": 4,
+    "disp": true,
+    "width": "12",
+    "collapse": false
+  },
+  {
+    "id": "grp_forecast",
+    "type": "ui_group",
+    "name": "",
+    "tab": "ui_tab_main",
+    "order": 5,
+    "disp": false,
+    "width": "12",
+    "collapse": false
+  },
   {
     "id": "ui_tab_main",
     "type": "ui_tab",

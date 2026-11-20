@@ -72,8 +72,8 @@ def build_feature_row(target_ts: pd.Timestamp, history: pd.Series) -> dict:
     date_str = target_ts.normalize().strftime("%Y-%m-%d")
     row = {
         "hour"              : target_ts.hour,
-        "day_of_week"       : target_ts.dayofweek,
-        "is_weekend"        : int(target_ts.dayofweek >= 5),
+        "day_of_week"       : target_ts.day_of_week,
+        "is_weekend"        : int(target_ts.day_of_week >= 5),
         "month"             : target_ts.month,
         "is_holiday"        : int(date_str in PH_HOLIDAYS),
         "lag_24h"           : _lag(history, target_ts, 24),
